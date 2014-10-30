@@ -41,7 +41,7 @@ def main():
     parser.add_option("-u", "--url",  dest="url",  default="http://localhost:4567", help="request sensu api url")
     parser.add_option("-n", "--name", dest="name", help="stash host name")
     parser.add_option("-a", "--all",  dest="all",  default=False, help="stash all host",  action="store_true")
-    parser.add_option("-e", "--expire",  dest="expire", default=300, help="stash expire time")
+    parser.add_option("-e", "--expire",  dest="expire", default=300, type="int", help="stash expire time")
     (options, args) = parser.parse_args()
     
     if options.all:
