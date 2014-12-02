@@ -11,15 +11,18 @@ import json
 now = int(time.mktime(datetime.now().timetuple()))
 
 ## apiへのアクセス
-def request_api(url, data):
+def request_api(url, data, delete = False):
     request = urllib2.Request(url)
-    
+
+    if delete:
+        request.get_method = lambda: 'DELETE'
+
     if data:
         request.add_header('Content-Type', 'application/json')
         request.add_data(json.dumps(data))
     try:
         response = urllib2.urlopen(request)
-        return response.read()
+        return response
     except urllib2.HTTPError, e:
         print e.code
         return False
@@ -42,13 +45,14 @@ def main():
     parser.add_option("-n", "--name", dest="name", help="stash host name")
     parser.add_option("-a", "--all",  dest="all",  default=False, help="stash all host",  action="store_true")
     parser.add_option("-e", "--expire",  dest="expire", default=300, type="int", help="stash expire time")
+    parser.add_option("-m", "--message",  dest="message", default="", type="string", help="stashe reasone message")
+    parser.add_option("-d", "--delete",  dest="delete", default=False, help="delete stash", action="store_true")
     (options, args) = parser.parse_args()
-    
+
     if options.all:
-        print options.url
         result = request_api(options.url + '/clients', None)
-        if result:
-            client_list = get_clients(result)
+        if result.code == 200:
+            client_list = get_clients(result.read())
         else:
             print "error: connection failed to sensu api."
             exit()
@@ -58,20 +62,28 @@ def main():
         print "Arg error: need arg -a or -n [host name]"
         parser.print_help()
         exit()
-    
+
     if client_list:
         for client in client_list:
-            request_client_data = {}
-            request_client_data['path'] = 'silence/' + client
-            request_client_data['expire'] = options.expire
-            request_client_data['content'] = {}
-            request_client_data['content']['comment'] = 'maintenance' 
-            request_client_data['content']['timestamp'] =now
-            
-            if request_api(options.url + '/stashes', request_client_data):
+            if options.delete:
+                request_uri = '/stashes/silence/' + client
+                request_client_data = {}
+            else:
+                request_uri = '/stashes'
+                request_client_data = {}
+                request_client_data['path'] = 'silence/' + client
+                request_client_data['expire'] = options.expire
+                request_client_data['content'] = {}
+                request_client_data['content']['source'] = 'stash script'
+                request_client_data['content']['reason'] = options.message
+                request_client_data['content']['timestamp'] =now
+
+            result = request_api(options.url + request_uri, request_client_data, options.delete)
+
+            if result.code == 201 or result.code == 204:
                 print "OK: " + client
             else:
                 print "NG: " + client
-                
+
 if __name__ == '__main__':
     main()
